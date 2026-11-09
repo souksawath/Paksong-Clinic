@@ -1,0 +1,6 @@
+{
+  "name": "ClinicCare Lao - ລະບົບຄຸ້ມຄອງຄລີນິກ ແລະ ລາຍຮັບ-ລາຍຈ່າຍ",
+  "description": "ລະບົບຕິດຕາມປະຫວັດຄົນເຈັບ, ການນັດໝາຍປິ່ນປົວ ແລະ ບັນທຶກລາຍຮັບ-ລາຍຈ່າຍຂອງຄລີນິກ ພ້ອມເຊື່ອມຕໍ່ Google Sheets ແລະ Google Drive",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

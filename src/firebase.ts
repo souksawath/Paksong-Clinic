@@ -9,8 +9,17 @@ import {
 } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+let app: any = null;
+let authInstance: any = null;
+
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  authInstance = getAuth(app);
+} catch (err) {
+  console.warn('Firebase initialization warning:', err);
+}
+
+export const auth = authInstance;
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -28,6 +37,10 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth) {
+    if (onAuthFailure) onAuthFailure();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -44,6 +57,9 @@ export const initAuth = (
 };
 
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+  if (!auth) {
+    throw new Error('Firebase Auth ຍັງບໍ່ທັນຖືກຕັ້ງຄ່າ ຫຼື ບໍ່ມີ config');
+  }
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -71,6 +87,8 @@ export const setAccessToken = (token: string | null) => {
 };
 
 export const logout = async () => {
-  await signOut(auth);
+  if (auth) {
+    await signOut(auth);
+  }
   cachedAccessToken = null;
 };

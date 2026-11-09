@@ -19,7 +19,9 @@ import {
   BadgeAlert,
   ArrowUpDown,
   History,
-  Check
+  Check,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { PatientModal } from './PatientModal';
 import { VisitModal } from './VisitModal';
@@ -43,6 +45,7 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
   onScheduleAppointment,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchTarget, setSearchTarget] = useState<'all' | 'name' | 'phone'>('all');
   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female'>('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(
     patients.length > 0 ? patients[0].id : null
@@ -51,24 +54,52 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
   // Modals state
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [patientToEdit, setPatientToEdit] = useState<Patient | null>(null);
+  const [prefillForNew, setPrefillForNew] = useState<{ name?: string; phone?: string } | undefined>(undefined);
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [selectedVisitForReceipt, setSelectedVisitForReceipt] = useState<MedicalVisit | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
-  // Filter patients
+  // Filter patients specifically by name or phone number
   const filteredPatients = patients.filter((p) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.hn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.phone.includes(searchTerm) ||
-      p.initialSymptoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.hometown.village.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.currentAddress.village.toLowerCase().includes(searchTerm.toLowerCase());
+    if (searchTerm.trim() !== '') {
+      const query = searchTerm.trim().toLowerCase();
+      const cleanQueryDigits = query.replace(/[^0-9]/g, '');
+      const cleanPhone = p.phone.replace(/[^0-9]/g, '');
+
+      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase();
+
+      const matchesName =
+        p.firstName.toLowerCase().includes(query) ||
+        p.lastName.toLowerCase().includes(query) ||
+        fullName.includes(query) ||
+        reverseName.includes(query);
+
+      const matchesPhone =
+        (cleanQueryDigits.length > 0 && cleanPhone.includes(cleanQueryDigits)) ||
+        p.phone.toLowerCase().includes(query);
+
+      const matchesHn = p.hn.toLowerCase().includes(query);
+
+      if (searchTarget === 'name') {
+        if (!matchesName && !matchesHn) return false;
+      } else if (searchTarget === 'phone') {
+        if (!matchesPhone) return false;
+      } else {
+        // 'all': matches by name OR phone number, or HN / symptoms
+        if (
+          !matchesName &&
+          !matchesPhone &&
+          !matchesHn &&
+          !p.initialSymptoms.toLowerCase().includes(query)
+        ) {
+          return false;
+        }
+      }
+    }
 
     const matchesGender = genderFilter === 'all' || p.gender === genderFilter;
-
-    return matchesSearch && matchesGender;
+    return matchesGender;
   });
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
@@ -78,11 +109,13 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
 
   const handleEditPatient = (p: Patient) => {
     setPatientToEdit(p);
+    setPrefillForNew(undefined);
     setIsPatientModalOpen(true);
   };
 
-  const handleNewPatient = () => {
+  const handleNewPatient = (prefill?: { name?: string; phone?: string }) => {
     setPatientToEdit(null);
+    setPrefillForNew(prefill);
     setIsPatientModalOpen(true);
   };
 
@@ -119,7 +152,7 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
 
           <div className="flex items-center gap-3">
             <button
-              onClick={handleNewPatient}
+              onClick={() => handleNewPatient()}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-teal-800 rounded-xl font-bold text-sm shadow-md hover:bg-teal-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <UserPlus className="w-4 h-4 text-teal-600" />
@@ -158,50 +191,129 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
         {/* Left Column: Patient Directory (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-            {/* Search and Filters */}
-            <div className="flex flex-col gap-3">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="ຄົ້ນຫາ: ຊື່, HN, ເບີໂທ, ບ້ານ, ອາການ..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
-                />
+            {/* Dedicated Search Bar for Searching Patients by Name or Phone Number */}
+            <div className="p-3.5 bg-gradient-to-b from-teal-50/70 to-slate-50/70 rounded-xl border border-teal-100 mb-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
+                  <Search className="w-3.5 h-3.5 text-teal-600" />
+                  <span>ຄົ້ນຫາຄົນເຈັບ (Search Patients)</span>
+                </div>
+                <span className="text-[10px] text-slate-500">
+                  ຄົ້ນຫາຕາມຊື່ ຫຼື ເບີໂທ
+                </span>
               </div>
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">
-                  ພົບ {filteredPatients.length} ລາຍການ
-                </span>
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              {/* Search target selector tabs */}
+              <div className="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSearchTarget('all')}
+                  className={`py-1 px-2 rounded-md font-medium text-[11px] transition-all flex items-center justify-center gap-1 ${
+                    searchTarget === 'all'
+                      ? 'bg-teal-700 text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Search className="w-3 h-3" />
+                  <span>ທັງໝົດ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchTarget('name')}
+                  className={`py-1 px-2 rounded-md font-medium text-[11px] transition-all flex items-center justify-center gap-1 ${
+                    searchTarget === 'name'
+                      ? 'bg-teal-700 text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <User className="w-3 h-3" />
+                  <span>ຊື່ / ນາມສະກຸນ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchTarget('phone')}
+                  className={`py-1 px-2 rounded-md font-medium text-[11px] transition-all flex items-center justify-center gap-1 ${
+                    searchTarget === 'phone'
+                      ? 'bg-teal-700 text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Phone className="w-3 h-3" />
+                  <span>ເບີໂທລະສັບ</span>
+                </button>
+              </div>
+
+              {/* Main Search Input */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-600" />
+                <input
+                  type="text"
+                  placeholder={
+                    searchTarget === 'phone'
+                      ? 'ພິມເບີໂທລະສັບ (e.g. 020 5544 3322 ຫຼື 5544)...'
+                      : searchTarget === 'name'
+                      ? 'ພິມຊື່ ຫຼື ນາມສະກຸນ (e.g. ສົມສັກ ຫຼື ວົງວິໄລ)...'
+                      : 'ຄົ້ນຫາຕາມຊື່, ນາມສະກຸນ ຫຼື ເບີໂທລະສັບ...'
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 focus:border-teal-500 shadow-xs"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    title="ລ້າງການຄົ້ນຫາ"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Results status & Gender filters */}
+              <div className="flex items-center justify-between text-xs pt-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-600 font-medium">
+                    ພົບ <strong className="text-teal-800 font-mono">{filteredPatients.length}</strong> ຄົນ
+                  </span>
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="text-[10px] text-teal-700 hover:underline font-semibold"
+                    >
+                      (ລ້າງຄຳຄົ້ນ)
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
                   <button
                     onClick={() => setGenderFilter('all')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
                       genderFilter === 'all'
-                        ? 'bg-white text-teal-700 shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-teal-50 text-teal-800 font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     ທັງໝົດ
                   </button>
                   <button
                     onClick={() => setGenderFilter('male')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
                       genderFilter === 'male'
-                        ? 'bg-white text-teal-700 shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-teal-50 text-teal-800 font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     ຊາຍ
                   </button>
                   <button
                     onClick={() => setGenderFilter('female')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
                       genderFilter === 'female'
-                        ? 'bg-white text-teal-700 shadow-xs font-semibold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-teal-50 text-teal-800 font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     ຍິງ
@@ -211,11 +323,42 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
             </div>
 
             {/* Patients List */}
-            <div className="mt-3 divide-y divide-slate-100 max-h-[620px] overflow-y-auto pr-1">
+            <div className="mt-3 divide-y divide-slate-100 max-h-[600px] overflow-y-auto pr-1">
               {filteredPatients.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">
+                <div className="py-10 px-4 text-center text-slate-500 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 my-2">
                   <User className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                  <p className="text-xs">ບໍ່ພົບຂໍ້ມູນຄົນເຈັບຕາມຄຳຄົ້ນຫາ</p>
+                  <p className="text-xs font-semibold text-slate-700">
+                    ບໍ່ພົບຂໍ້ມູນຄົນເຈັບ{searchTerm ? ` ທີ່ກົງກັບ "${searchTerm}"` : ''}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {searchTarget === 'phone'
+                      ? 'ກວດສອບເບີໂທລະສັບຄືນໃໝ່ ຫຼື ປ່ຽນໄປຄົ້ນຫາຕາມຊື່'
+                      : searchTarget === 'name'
+                      ? 'ກວດສອບຊື່ ຫຼື ນາມສະກຸນຄືນໃໝ່ ຫຼື ລົງທະບຽນໃໝ່'
+                      : 'ກວດສອບຊື່, ເບີໂທ ຫຼື ລົງທະບຽນຄົນເຈັບໃໝ່'}
+                  </p>
+                  {searchTerm && (
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="px-3 py-1.5 text-[11px] bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 font-medium"
+                      >
+                        ລ້າງຄຳຄົ້ນຫາ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const isDigits = /^[0-9\s+]+$/.test(searchTerm);
+                          handleNewPatient(isDigits ? { phone: searchTerm } : { name: searchTerm });
+                        }}
+                        className="px-3 py-1.5 text-[11px] bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-xs flex items-center gap-1"
+                      >
+                        <UserPlus className="w-3 h-3" />
+                        <span>+ ລົງທະບຽນໃໝ່ດ້ວຍ "{searchTerm}"</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 filteredPatients.map((patient) => {
@@ -224,6 +367,12 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
                     patient.drugAllergies &&
                     patient.drugAllergies !== 'ບໍ່ມີ' &&
                     patient.drugAllergies !== 'ບໍ່ມີປະຫວັດແພ້ຢາ';
+
+                  // Check if search matches phone specifically
+                  const cleanQuery = searchTerm.replace(/[^0-9]/g, '');
+                  const cleanPhone = patient.phone.replace(/[^0-9]/g, '');
+                  const phoneMatches =
+                    cleanQuery.length > 0 && cleanPhone.includes(cleanQuery);
 
                   return (
                     <div
@@ -255,9 +404,20 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
                                 {patient.hn}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-500">
-                              {patient.age} ປີ • ໂທ: {patient.phone || '-'}
-                            </p>
+                            <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span>{patient.age} ປີ</span>
+                              <span>•</span>
+                              <span
+                                className={`inline-flex items-center gap-1 ${
+                                  phoneMatches || (searchTarget === 'phone' && searchTerm)
+                                    ? 'px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                <Phone className="w-3 h-3 text-teal-600" />
+                                {patient.phone || '-'}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -570,6 +730,7 @@ export const PatientManagement: React.FC<PatientManagementProps> = ({
         onSave={onSavePatient}
         patientToEdit={patientToEdit}
         patientCount={patients.length}
+        prefillData={prefillForNew}
       />
 
       {/* Visit Record Modal */}

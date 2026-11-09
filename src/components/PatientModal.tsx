@@ -8,6 +8,7 @@ interface PatientModalProps {
   onSave: (patient: Patient) => void;
   patientToEdit?: Patient | null;
   patientCount: number;
+  prefillData?: { name?: string; phone?: string };
 }
 
 const LAO_PROVINCES = [
@@ -37,6 +38,7 @@ export const PatientModal: React.FC<PatientModalProps> = ({
   onSave,
   patientToEdit,
   patientCount,
+  prefillData,
 }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -110,11 +112,18 @@ export const PatientModal: React.FC<PatientModalProps> = ({
       setNotes(patientToEdit.notes || '');
     } else {
       // Reset form
-      setFirstName('');
-      setLastName('');
+      let defaultFirst = '';
+      let defaultLast = '';
+      if (prefillData?.name) {
+        const parts = prefillData.name.trim().split(/\s+/);
+        defaultFirst = parts[0] || '';
+        defaultLast = parts.slice(1).join(' ') || '';
+      }
+      setFirstName(defaultFirst);
+      setLastName(defaultLast);
       setGender('male');
       setBirthDate('1995-01-01');
-      setPhone('');
+      setPhone(prefillData?.phone || '');
       setHomeVillage('');
       setHomeDistrict('');
       setHomeProvince('ນະຄອນຫຼວງວຽງຈັນ');
@@ -131,7 +140,7 @@ export const PatientModal: React.FC<PatientModalProps> = ({
       setNotes('');
       setSameAsHometown(false);
     }
-  }, [patientToEdit, isOpen]);
+  }, [patientToEdit, isOpen, prefillData]);
 
   const handleCopyHometown = (checked: boolean) => {
     setSameAsHometown(checked);
